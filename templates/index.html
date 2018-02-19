@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <title>Ge'ez Numeral - Online Recognition Data Collector</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+        <script src="http://code.jquery.com/jquery-3.3.1.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+        <style type='text/css'>
+            .sample {
+                border: 1px black solid;
+            }
+            h1 {
+                text-align: center;
+            }
+
+        </style>
+    </head>
+    <body>
+        <div>
+            
+            
+            <div class="container">
+                <h1>Ge'ez Numeral - Online Recognition</h1>
+                <div class="container">
+                
+                        <p id="currentChar" style="font-size: 192px; padding: 0; margin: 0"></p>
+                
+                        <h4>Samples</h4>
+                        <hr>
+                        <div id="imageContainer">
+                        </div>
+                    
+                </div>
+                <hr/>
+
+                <div class="col-md-12">
+                    <canvas id="thefreecanvas"  width="300" height="300" style="top:10%;left:10%;border:2px solid;"></canvas>
+                </div>
+                
+                
+            </div>
+            <div class="container">
+                <div class="btn-group">
+                    <!-- <button type="button" id="sampleSubmit">Submit Sample</button>
+                    <!--<button type="button" id="recognizeSample">Recognize Sample</button>-->
+                    <!-- <button type="button" id="clearCanvas">Clear Canvas</button> --> 
+                    <button id="sampleSubmit" type="button" class="btn btn-success">Save</button>
+                    <button id="clearCanvas" type="button" class="btn btn-danger">Clear</button>
+
+                </div>
+            </div>
+      </div>
+    </body>
+
+
+    <script>
+        $(document).ready(function() {
+            classes = {
+                1:"፩",
+                2:"፪",
+                3 :"፫",
+                4 :"፬",
+                5 :"፭",
+                6 :"፮",
+                7 :"፯",
+                8 :"፰",
+                9 :"፱",
+                10 :"፲",
+                11 :"፳",
+                12 :"፴",
+                13 :"፵",
+                14 :"፶",
+                15 :"፷",
+                16 :"፸",
+                17 :"፹",
+                18 :"፺",
+                19 :"፻",
+                20 :"፼",
+            };
+            var canvas = $('#thefreecanvas')[0];
+            var context = canvas.getContext('2d');
+            var tracePoints = [] // gather the points as array of [x, y]
+            var imageClass = 1 //Set the image class
+            var currentChar = $("#currentChar");
+            currentChar.text(classes[((imageClass-1) %20 ) +1]);
+            initListener(canvas);
+
+            // Mouse states 
+            // A writing action implies there is a mouse enter + down 
+            // Where as mouse out + mouse down is not considered to be in a writing state
+
+            var isWriting = false;
+
+
+            function initListener(canvas) {
+                canvas.addEventListener('mousemove', function (event) {
+                    console.log(event, 'MOUSE ENTER');
+                    var x, y; 
+                    x = event.offsetX;
+                    y = event.offsetY;
+
+                    if (isWriting) {
+                        context.lineWidth = 10;
+                        context.lineCap = 'round';
+                        context.lineJoin = 'round';
+                        context.lineTo(x, y);
+                        tracePoints.push([x, y]);
+                        context.stroke();
+                    }
+                });
+                canvas.addEventListener('mousedown', function(event) {
+                    var x, y;
+                    x = event.offsetX;
+                    y = event.offsetY;
+                    console.log(x, y, 'Current position');
+
+
+                    if (!isWriting) {
+                        isWriting = true;
+                        console.log('Path has began', isWriting);
+                        context.beginPath();
+                        context.moveTo(x, y);
+                        tracePoints.push([x, y]);
+                    } else {
+                        console.log('Path is being drawn', isWriting);                        
+                        context.lineTo(x, y);
+                        tracePoints.push([x, y]);
+                        context.lineWidth = 10;
+                        context.lineCap = 'round';
+                        context.lineJoin = 'round';
+                        context.stroke();
+                    }
+                });
+
+                canvas.addEventListener('mouseout', function(event) {
+                    isWriting = false;
+                });
+
+                canvas.addEventListener('mouseup', function(event) {
+                    isWriting = false;
+                });
+            }
+            // Clears the canvas to accept a new handwriting 
+            function clearCanvas () {
+                // clear canvas 
+                tracePoints = [];
+                context.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
+            function submitSample() {
+                var dataUrl = canvas.toDataURL();
+                $('#imageContainer').append("<div class='col-md-2'><img class='sample' id='"+ imageClass +"' width='50' height='50' src='" +dataUrl + "'/></div>");
+                sendSamples(dataUrl);
+                clearCanvas();
+                imageClass++;
+                currentChar.text(classes[((imageClass-1) %20 ) +1]);
+            }
+
+
+            function sendSamples(sample) {
+                var data = { 
+                    img: sample, 
+                    imgClass: imageClass, 
+                    path: JSON.stringify(tracePoints)
+                } ;
+
+                console.log(data)
+                $.ajax({ 
+                    url: 'http://localhost:5000/upload',
+                    type: 'POST',
+                    cache: false, 
+                    data: data, 
+                    dataType: 'json', 
+                    success: function(data){
+                        console.log('Success!')
+                    }
+                    , error: function(jqXHR, textStatus, err){
+                        console.log('text status '+textStatus+', err '+err)
+                    }
+                });
+                // var samples = $('.sample');
+                // for(var i = 0; i < samples.length; i++) {
+                //     console.log(samples[i]);
+                // }
+            }
+            
+            // UI - Action Mapping 
+            $('#sampleSubmit').click(function() {
+                submitSample(); 
+            });
+
+            $("#clearCanvas").click(function () {
+                console.log('clearing canvas ');
+                clearCanvas();
+            });
+
+            // UI - Action Mapping 
+        });
+        
+
+    </script>
+
+</html>
